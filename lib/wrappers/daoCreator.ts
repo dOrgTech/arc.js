@@ -89,7 +89,7 @@ export class DaoCreatorWrapper extends ContractWrapperBase {
      * so we do a proper estimate here.  We're estimating even when universal since
      * the value will be optimial for the user in any case.
      */
-    const totalGas = await this.estimateGas(this.contract.forgeOrg, paramsArray);
+    //const totalGas = await this.estimateGas(this.contract.forgeOrg, paramsArray);
 
     this.logContractFunctionCall("DaoCreator.forgeOrg (options)", options);
 
@@ -98,7 +98,7 @@ export class DaoCreatorWrapper extends ContractWrapperBase {
       founderAddresses: options.founders.map((founder: FounderConfig) => web3.toBigNumber(founder.address)),
       founderReputation: options.founders.map((founder: FounderConfig) => web3.toBigNumber(founder.reputation)),
       founderTokens: options.founders.map((founder: FounderConfig) => web3.toBigNumber(founder.tokens)),
-      gas: { gas: totalGas },
+      gas: { },
       name: options.name,
       tokenCap: options.tokenCap,
       tokenName: options.tokenName,
@@ -109,7 +109,7 @@ export class DaoCreatorWrapper extends ContractWrapperBase {
       options,
       this.contract.forgeOrg,
       paramsArray,
-      { gas: totalGas }
+      { }
     );
   }
 
