@@ -383,7 +383,7 @@ export class GenesisProtocolWrapper extends IntVoteInterfaceWrapper
     }
 
     this.logContractFunctionCall("GenesisProtocol.threshold",
-      { schemeInfo, avatarAddress, votingMachineParamsHash, organizationId });
+      { address: schemeInfo.address, avatarAddress, votingMachineParamsHash, organizationId });
 
     return this.contract.threshold(votingMachineParamsHash, organizationId);
   }
@@ -891,24 +891,28 @@ export class GenesisProtocolWrapper extends IntVoteInterfaceWrapper
   }
 
   public async getParameters(paramsHash: Hash): Promise<GetGenesisProtocolParamsResult> {
-    const params = await this.getParametersArray(paramsHash);
-    return {
-      boostedVotePeriodLimit: params[0][2].toNumber(),
-      daoBountyConst: params[0][12].toNumber(),
-      daoBountyLimit: params[0][13],
-      minimumStakingFee: params[0][5].toNumber(),
-      preBoostedVotePeriodLimit: params[0][1].toNumber(),
-      preBoostedVoteRequiredPercentage: params[0][0].toNumber(),
-      proposingRepRewardConstA: params[0][7].toNumber(),
-      proposingRepRewardConstB: params[0][8].toNumber(),
-      quietEndingPeriod: params[0][6].toNumber(),
-      stakerFeeRatioForVoters: params[0][9].toNumber(),
-      thresholdConstA: params[0][3],
-      thresholdConstB: params[0][4].toNumber(),
-      voteOnBehalf: params[1],
-      votersGainRepRatioFromLostRep: params[0][11].toNumber(),
-      votersReputationLossRatio: params[0][10].toNumber(),
-    };
+    const paramsArray = await this.getParametersArray(paramsHash);
+    const params = {
+      boostedVotePeriodLimit: paramsArray[2].toNumber(),
+      minimumStakingFee: paramsArray[5],
+      preBoostedVotePeriodLimit: paramsArray[1].toNumber(),
+      preBoostedVoteRequiredPercentage: paramsArray[0].toNumber(),
+      proposingRepRewardConstA: paramsArray[7].toNumber(),
+      proposingRepRewardConstB: paramsArray[8].toNumber(),
+      quietEndingPeriod: paramsArray[6].toNumber(),
+      stakerFeeRatioForVoters: paramsArray[9].toNumber(),
+      thresholdConstA: paramsArray[3],
+      thresholdConstB: paramsArray[4].toNumber(),
+      voteOnBehalf: paramsArray[12],
+      votersGainRepRatioFromLostRep: paramsArray[11].toNumber(),
+      votersReputationLossRatio: paramsArray[10].toNumber(),
+    } as GetGenesisProtocolParamsResult;
+
+    const bountyParamsArray = await this.contract.getDaoBountyParams(paramsHash);
+    params.daoBountyConst = bountyParamsArray[0].toNumber();
+    params.daoBountyLimit = bountyParamsArray[1];
+
+    return params;
   }
 
   /**
@@ -1204,7 +1208,7 @@ export interface GetGenesisProtocolParamsResult {
   proposingRepRewardConstB: number;
   quietEndingPeriod: number;
   stakerFeeRatioForVoters: number;
-  thresholdConstA: BigNumber | string;
+  thresholdConstA: BigNumber;
   thresholdConstB: number;
   voteOnBehalf: Address;
   votersGainRepRatioFromLostRep: number;

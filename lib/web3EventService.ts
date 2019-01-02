@@ -9,7 +9,7 @@ import { UtilsInternal } from "./utilsInternal";
  * Support for working with events that originate from Arc contracts
  * and are served up by Web3.
  *
- * For more information, see [Web3 Events](/Events#web3events).
+ * For more information, see [Web3 Events](/Events.md#web3events).
  */
 export class Web3EventService {
   /**
@@ -21,7 +21,7 @@ export class Web3EventService {
    * may alternatively obtain the promise of a `Array<TEventArgs>` from the return value
    * of `get`.
    *
-   * For more information, see [Web3 Events](/Events#web3events).
+   * For more information, see [Web3 Events](/Events.md#web3events).
    *
    * @param baseEvent - the event from the Truffle contract.
    * @param preProcessEvent - optionally supply this to modify the err and log arguments before they are
@@ -141,7 +141,7 @@ export class Web3EventService {
    * may alternatively obtain the promise of a `Array<TEntity>` from the return value
    * of `get`.
    *
-   * See [Arc Web3 Events in Arc.js](/Events#web3events).
+   * See [Arc Web3 Events in Arc.js](/Events.md#web3events).
    *
    * @param eventFetcherFactory
    * @param transformEventCallback Function to convert an instance of TEventArgs into

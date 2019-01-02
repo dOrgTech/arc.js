@@ -2,13 +2,12 @@ import { promisify } from "es6-promisify";
 import { Address } from "./commonTypes";
 import { LoggingService } from "./loggingService";
 import { IEventSubscription, PubSubEventService } from "./pubSubEventService";
-import { Utils, Web3 } from "./utils";
-import { UtilsInternal } from "./utilsInternal";
+import { Utils } from "./utils";
 
 /**
  * Watch for changes in the default account.
  *
- * For more information, see [Account Changes](Configuration#accountchanges).
+ * For more information, see [Account Changes](/Configuration.md#accountchanges).
  */
 export class AccountService {
 
@@ -22,7 +21,7 @@ export class AccountService {
    * for `watchForAccountChanges` to `InitializeArcJs`.  You may also call it manually yourself.
    *
    * Then you may request to be notified whenever the current account changes by calling
-   * [AccountService.subscribeToAccountChanges](/api/classes/AccountService#subscribeToAccountChanges)
+   * [AccountService.subscribeToAccountChanges](/arc.js/api/classes/AccountService#subscribeToAccountChanges)
    */
   public static async initiateAccountWatch(): Promise<void> {
 
@@ -70,7 +69,7 @@ export class AccountService {
    * for `watchForNetworkChanges` to `InitializeArcJs`.  You may also call it manually yourself.
    *
    * Then you may request to be notified whenever the current account changes by calling
-   * [AccountService.subscribeToNetworkChanges](/api/classes/AccountService#subscribeToNetworkChanges)
+   * [AccountService.subscribeToNetworkChanges](/arc.js/api/classes/AccountService#subscribeToNetworkChanges)
    *
    * When the network is found to have changed you should call `InitializeArcJs` so Arc.js will set
    * itself up with the new network and return to you a new `Web3` object.
@@ -168,7 +167,7 @@ export class AccountService {
   private static networkChangedTimerId: any;
 
   private static async getNetworkId(): Promise<number | undefined> {
-    const web3 = UtilsInternal.getWeb3Sync();
+    const web3 = await Utils.getWeb3();
     return web3 ?
       Number.parseInt(await promisify(web3.version.getNetwork)() as string, 10) as number | undefined : undefined;
   }

@@ -1,6 +1,6 @@
 import { BigNumber } from "bignumber.js";
 import { promisify } from "es6-promisify";
-import { Address, DefaultSchemePermissions, Hash, SchemePermissions } from "./commonTypes";
+import { Address, Hash } from "./commonTypes";
 import { ConfigService } from "./configService";
 import { ControllerService } from "./controllerService";
 import {
@@ -112,39 +112,11 @@ export abstract class ContractWrapperBase implements IContractWrapper {
   }
 
   /**
-   * Initialize as it was migrated by Arc.js on the current network.
-   * @returns this or undefined if not found
-   */
-  public async hydrateFromDeployed(): Promise<IContractWrapper> {
-    try {
-      // Note that because we are using `.then`, we are returning a true promise
-      // rather than the incomplete one returned by truffle.
-      this.contract = await this.solidityContract.deployed()
-        .then((contract: any) => contract, (error: any) => { throw error; });
-      this.hydrated();
-    } catch (ex) {
-      LoggingService.error(`hydrateFromDeployed failing: ${ex}`);
-      return undefined;
-    }
-    return this;
-  }
-
-  /**
    * Given a hash, returns the associated parameters as an object.
    * @param paramsHash
    */
   public getParameters(paramsHash: Hash): Promise<any> {
     throw new Error("getParameters has not been not implemented by the contract wrapper");
-  }
-
-  /**
-   * Given an avatar address, returns the schemes parameters hash
-   * @param avatarAddress
-   */
-  public async getSchemeParametersHash(avatarAddress: Address): Promise<Hash> {
-    const controllerService = new ControllerService(avatarAddress);
-    const controller = await controllerService.getController();
-    return controller.getSchemeParameters(this.address, avatarAddress);
   }
 
   /**
@@ -178,6 +150,7 @@ export abstract class ContractWrapperBase implements IContractWrapper {
 
     const maxGasLimit = await UtilsInternal.computeMaxGasLimit();
 
+    // note that Ganache is identified specifically as the one instantiated by arc.js (by the networkId)
     if (currentNetwork === "Ganache") {
       return maxGasLimit; // because who cares with ganache and we can't get good estimates from it
     }
@@ -191,20 +164,6 @@ export abstract class ContractWrapperBase implements IContractWrapper {
      */
     params = params.concat(Object.assign({ gas: maxGasLimit }, web3Params));
     return Math.max(Math.min((await func.estimateGas(...params)), maxGasLimit), 21000);
-  }
-
-  /**
-   * TODO: getDefaultPermissions should be moved to a new subclass `SchemeWrapper`
-   * which itself would be a base class for a new class `UniversalScheme`
-   */
-
-  /**
-   * Any scheme that needs greater permissions should override this
-   * @hidden - for internal use only.
-   * This method will eventually be moved (see comment above)
-   */
-  public getDefaultPermissions(): SchemePermissions {
-    return DefaultSchemePermissions.MinimumPermissions as number;
   }
 
   /**
@@ -229,29 +188,12 @@ export abstract class ContractWrapperBase implements IContractWrapper {
     return new ArcTransactionDataResult<Hash>(txResult.tx, this.contract, parametersHash);
   }
 
-  /**
-   * Returns this scheme's permissions.
-   * @param avatarAddress
-   */
-  protected async _getSchemePermissions(avatarAddress: Address): Promise<SchemePermissions> {
-    const controllerService = new ControllerService(avatarAddress);
-    const controller = await controllerService.getController();
-    const permissions = await controller.getSchemePermissions(this.address, avatarAddress) as string;
-
-    return SchemePermissions.fromString(permissions);
-  }
-
-  protected async _getSchemeParameters(avatarAddress: Address): Promise<any> {
-    const paramsHash = await this.getSchemeParametersHash(avatarAddress);
-    return this.getParameters(paramsHash);
-  }
-
   protected _getParametersHash(...params: Array<any>): Promise<Hash> {
     return this.contract.getParametersHash(...params);
   }
 
   /**
-   * See [Web3EventService.createEventFetcherFactory](Web3EventService#createEventFetcherFactory).
+   * See [Web3EventService.createEventFetcherFactory](Web3EventService.md#createEventFetcherFactory).
    *
    * @type TArgs
    * @param eventName

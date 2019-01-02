@@ -6,12 +6,11 @@ const {
   copy,
   mkdirp
 } = require("nps-utils");
-const env = require("env-variable")();
 const joinPath = require("path.join");
 const cwd = require("cwd")();
-const config = require("./config/default.json");
 
 const runningInRepo = fs.existsSync(".git");
+const migrationsExist = fs.existsSync("migration.json");
 const pathArcJsRoot = cwd;
 
 const pathNodeModules = runningInRepo ? joinPath(".", "node_modules") : joinPath("..", "..", "node_modules");
@@ -19,6 +18,10 @@ const pathNodeModules = runningInRepo ? joinPath(".", "node_modules") : joinPath
 const pathDaostackArcRepo = runningInRepo ?
   joinPath(pathNodeModules, "@daostack", "arc") :
   joinPath("..", "arc");
+
+const pathDaostackMigrationsRepo = runningInRepo ?
+  joinPath(pathNodeModules, "@daostack", "migration") :
+  joinPath("..", "migration");
 
 const pathArcJsContracts = joinPath(".", "migrated_contracts");
 const pathArcTest = joinPath(".", "test");
@@ -28,20 +31,9 @@ const pathDaostackArcGanacheDb = joinPath(".", "ganacheDb");
 const pathDaostackArcGanacheDbZip = joinPath(".", "ganacheDb.zip");
 const pathTypeScript = joinPath(pathNodeModules, "typescript/bin/tsc");
 
-const network = env.arcjs_network || config.network || "ganache";
-
-let truffleCommand;
-if (runningInRepo) {
-  truffleCommand = "truffle"; // use global version of truffle.
-} else { // assume we are running in application context
-  truffleCommand = `node ${joinPath("..", "..", "truffle-core-migrate-without-compile", "cli")}`;
-}
-
 const ganacheGasLimit = 8000000; // something reasonably close to live
-const ganacheCommand = `ganache-cli -l ${ganacheGasLimit}  --networkId 1512051714758 --account="0x8d4408014d165ec69d8cc9f091d8f4578ac5564f376f21887e98a6d33a6e3549,9999999999999999999999999999999999999999999" --account="0x2215f0a41dd3bb93f03049514949aaafcf136e6965f4a066d6bf42cc9f75a106,9999999999999999999999999999999999999999999" --account="0x6695c8ef58fecfc7410bf8b80c17319eaaca8b9481cc9c682fd5da116f20ef05,9999999999999999999999999999999999999999999" --account="0xb9a8635b40a60ad5b78706d4ede244ddf934dc873262449b473076de0c1e2959,9999999999999999999999999999999999999999999" --account="0x55887c2c6107237ac3b50fb17d9ff7313cad67757e44d1be5eb7bbf9fc9ca2ea,9999999999999999999999999999999999999999999" --account="0xb16a587ad59c2b3a3f47679ed2df348d6828a3bb5c6bb3797a1d5a567ce823cb,9999999999999999999999999999999999999999999"`;
-const ganacheDbCommand = `ganache-cli --db ${pathDaostackArcGanacheDb} -l ${ganacheGasLimit} --networkId 1512051714758 --mnemonic "behave pipe turkey animal voyage dial relief menu blush match jeans general"`;
-
-const migrationScriptExists = fs.existsSync(joinPath(".", "dist", "migrations", "2_deploy_schemes.js"));
+const ganacheCommand = `ganache-cli -l ${ganacheGasLimit} --networkId 1512051714758 --defaultBalanceEther 999999999999999 --deterministic`;
+const ganacheDbCommand = `ganache-cli --db ${pathDaostackArcGanacheDb} --networkId 1512051714758 -l ${ganacheGasLimit} --defaultBalanceEther 999999999999999 --deterministic`;
 
 module.exports = {
   scripts: {
@@ -101,6 +93,7 @@ module.exports = {
           mkdirp(joinPath(pathArcTestBuild, "config")),
           copy(`${joinPath(".", "config", "**", "*")} ${joinPath(pathArcTestBuild, "config")}`),
           copy(`${joinPath(pathArcJsContracts, "**", "*")} ${joinPath(pathArcTestBuild, "migrated_contracts")}`),
+          copy(`${joinPath(pathArcJsRoot, "migration.json")} ${pathArcTestBuild}`),
           mkdirp(pathArcTestBuild),
           `node ${pathTypeScript} --outDir ${pathArcTestBuild} --project ${pathArcTest}`
         ),
@@ -116,8 +109,15 @@ module.exports = {
       clean: rimraf(pathArcDist)
     },
     deploy: {
-      pack: series("nps build", "npm pack"),
-      publish: series("nps build", "npm publish")
+      ensureMigrations: migrationsExist ? "" : `node  ${joinPath(".", "package-scripts", "fail")} "migrations.json doesn't exist"`,
+      pack: series(
+        "nps deploy.ensureMigrations",
+        "nps build",
+        "npm pack"),
+      publish: series(
+        "nps deploy.ensureMigrations",
+        "nps build",
+        "npm publish")
     },
     createGenesisDao: {
       default: `node  ${joinPath(".", "package-scripts", "createGenesisDao.js")}`
@@ -131,13 +131,12 @@ module.exports = {
        *
        * Truffle will merge this migration with whatever previous ones are already present in the contract json files.
        *
-       * Run migrateContracts.fetchFromArc first if you want to start with fresh unmigrated contracts from @daostack/arc.
+       * Run migrateContracts.fetchContracts first if you want to start with fresh unmigrated contracts from @daostack/arc.
        *
        * use --reset for ganacheDb if it is crashing on re-migration.
        */
       default: series(
-        migrationScriptExists ? `` : `nps build`,
-        `${truffleCommand} migrate --reset --contracts_build_directory ${pathArcJsContracts} --without-compile --network ${network}`
+        `node ${joinPath(".", "package-scripts", "migrateContracts.js")} "${joinPath(pathArcJsRoot, "migration.json")}"`
       ),
       andCreateGenesisDao: series(
         `nps migrateContracts`,
@@ -151,25 +150,13 @@ module.exports = {
        * from scratch.  Otherwise, truffle will merge your migrations into whatever  previous
        * ones exist.
        */
-      clean: {
-        default: rimraf(joinPath(pathArcJsContracts, "*")),
-        /**
-         * clean and fetch.
-         * Run this ONLY when you want to start with fresh UNMIGRATED contracts from @daostack/arc.
-         */
-        andFetchFromArc: series(
-          "nps migrateContracts.clean",
-          "nps migrateContracts.fetchFromArc"
-        ),
-        /**
-         * clean, fetch and migrate.
-         * Run this ONLY when you want to start with fresh UNMIGRATED contracts from @daostack/arc.
-         */
-        andMigrate: series(
-          "nps migrateContracts.clean.andFetchFromArc",
-          "nps migrateContracts"
-        )
-      },
+      clean: rimraf(joinPath(pathArcJsContracts, "*")),
+
+      fetchContracts: series(
+        "nps migrateContracts.clean",
+        "nps migrateContracts.fetchFromArc",
+        "nps migrateContracts.fetchFromDaostack"
+      ),
       /**
        * Fetch the unmigrated contract json files from DAOstack Arc.
        * Run this ONLY when you want to start with fresh UNMIGRATED contracts from DAOstack Arc.
@@ -179,6 +166,13 @@ module.exports = {
        */
       fetchFromArc: series(
         copy(`${joinPath(pathDaostackArcRepo, "build", "contracts", "*")}  ${pathArcJsContracts}`)
+      ),
+      /**
+       * fetch contract addresses from the DAOstack migrations package.
+       */
+      fetchFromDaostack: series(
+        copy(`${joinPath(pathDaostackMigrationsRepo, "migration.json")}  ${pathArcJsRoot}`),
+        `node ${joinPath(".", "package-scripts", "cleanMigrationJson.js")}`,
       ),
     },
     docs: {
